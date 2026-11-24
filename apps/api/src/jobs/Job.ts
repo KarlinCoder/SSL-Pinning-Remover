@@ -47,7 +47,13 @@ export class Job {
 
   constructor(inputUrl: string) {
     this.inputUrl = inputUrl;
-    this.sourceHost = new URL(inputUrl).hostname;
+    let parsedHostname: string;
+    try {
+      parsedHostname = new URL(inputUrl).hostname;
+    } catch {
+      parsedHostname = 'upload';
+    }
+    this.sourceHost = parsedHostname;
     this.jobDir = path.join(config.jobsDir, this.id);
   }
 

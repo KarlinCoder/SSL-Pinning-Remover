@@ -130,8 +130,8 @@ export default function App() {
     setJobId(snapshot.id);
   }, []);
 
-  const handleUpload = useCallback(async (file: File) => {
-    const snapshot = await api.uploadFile(file);
+  const handleUpload = useCallback(async (file: File, onProgress?: (percent: number) => void) => {
+    const snapshot = await api.uploadFile(file, onProgress);
     setInitialJob(snapshot);
     setJobId(snapshot.id);
   }, []);

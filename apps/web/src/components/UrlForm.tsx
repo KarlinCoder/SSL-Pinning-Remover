@@ -57,6 +57,7 @@ export function UrlForm({ onSubmit, onUpload, maxApkMb }: UrlFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'url' | 'file'>('url');
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -119,11 +120,15 @@ export function UrlForm({ onSubmit, onUpload, maxApkMb }: UrlFormProps) {
 
     setBusy(true);
     setError(null);
+    setUploadProgress(0);
 
     try {
-      await onUpload(selectedFile);
+      await onUpload(selectedFile, (percent) => {
+        setUploadProgress(percent);
+      });
       setSelectedFile(null);
       if (fileRef.current) fileRef.current.value = '';
+      setUploadProgress(null);
     } catch (submitError) {
       if (submitError instanceof ApiError) {
         setError({ message: submitError.message, hint: submitError.hint });
@@ -135,6 +140,7 @@ export function UrlForm({ onSubmit, onUpload, maxApkMb }: UrlFormProps) {
               : 'No se pudo crear el trabajo.',
         });
       }
+      setUploadProgress(null);
     } finally {
       setBusy(false);
     }
@@ -344,6 +350,21 @@ export function UrlForm({ onSubmit, onUpload, maxApkMb }: UrlFormProps) {
                 <XIcon className="h-3.5 w-3.5" />
                 Quitar
               </button>
+            </div>
+          )}
+
+          {uploadProgress !== null && busy && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Subiendo archivo…</span>
+                <span className="font-mono text-lab-lime">{uploadProgress}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full bg-lab-lime transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             </div>
           )}
 

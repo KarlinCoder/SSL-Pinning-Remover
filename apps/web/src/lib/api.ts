@@ -60,12 +60,52 @@ export const api = {
     });
   },
 
-  uploadFile(file: File): Promise<JobSnapshot> {
-    const formData = new FormData();
-    formData.append('file', file);
-    return request<JobSnapshot>('/api/upload', {
-      method: 'POST',
-      body: formData,
+  uploadFile(file: File, onProgress?: (percent: number) => void): Promise<JobSnapshot> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append('file', file);
+
+      xhr.open('POST', '/api/upload', true);
+      xhr.withCredentials = true;
+
+      if (onProgress && xhr.upload) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded * 100) / event.total);
+            onProgress(percent);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        let payload: any = null;
+        try {
+          payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+        } catch {
+          payload = null;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as JobSnapshot);
+        } else {
+          const error = payload?.error;
+          reject(
+            new ApiError(
+              error?.code ?? 'HTTP_ERROR',
+              error?.message ?? `Error HTTP ${xhr.status}.`,
+              error?.hint,
+              xhr.status,
+            ),
+          );
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new ApiError('NETWORK_ERROR', 'Error de red al subir el archivo.'));
+      };
+
+      xhr.send(formData);
     });
   },
 

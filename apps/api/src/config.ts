@@ -30,8 +30,6 @@ function envList(name: string, fallback: string[]): string[] {
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(moduleDir, '..', '..', '..');
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(repoRoot, 'data'));
-const appPassword = process.env.APP_PASSWORD ?? '';
-const providedSecret = process.env.SESSION_SECRET?.trim();
 
 const allowedPorts = new Set(
   envList('ALLOWED_PORTS', ['80', '443'])
@@ -53,11 +51,10 @@ export const config = {
   webDist: path.resolve(
     process.env.WEB_DIST || path.join(repoRoot, 'apps', 'web', 'dist'),
   ),
-  appPassword,
-  authRequired: appPassword.length > 0,
-  sessionSecret: providedSecret || randomBytes(32).toString('hex'),
-  generatedSessionSecret: !providedSecret,
-  cookieSecure: envBool('COOKIE_SECURE', false),
+  authRequired: false,
+  sessionSecret: randomBytes(32).toString('hex'),
+  generatedSessionSecret: true,
+  cookieSecure: false,
   trustProxy: envBool('TRUST_PROXY', false),
   maxApkBytes: envInt('MAX_APK_MB', 1024, 1, 8192) * 1024 * 1024,
   maxConcurrentJobs: envInt('MAX_CONCURRENT_JOBS', 1, 1, 3),

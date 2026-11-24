@@ -1,4 +1,4 @@
-import type { AppConfig, AuthState, JobSnapshot } from '../types';
+import type { AppConfig, JobSnapshot } from '../types';
 
 export class ApiError extends Error {
   constructor(
@@ -34,10 +34,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('apk-lab:unauthorized'));
-    }
-
     const error = (payload as { error?: { code?: string; message?: string; hint?: string } } | null)
       ?.error;
 
@@ -57,25 +53,19 @@ export const api = {
     return request<AppConfig>('/api/config');
   },
 
-  getAuthState(): Promise<AuthState> {
-    return request<AuthState>('/api/auth/me');
-  },
-
-  login(password: string): Promise<AuthState> {
-    return request<AuthState>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    });
-  },
-
-  logout(): Promise<{ ok: true }> {
-    return request<{ ok: true }>('/api/auth/logout', { method: 'POST' });
-  },
-
   createJob(url: string): Promise<JobSnapshot> {
     return request<JobSnapshot>('/api/jobs', {
       method: 'POST',
       body: JSON.stringify({ url }),
+    });
+  },
+
+  uploadFile(file: File): Promise<JobSnapshot> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<JobSnapshot>('/api/upload', {
+      method: 'POST',
+      body: formData,
     });
   },
 

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AuthGate } from './components/AuthGate';
 import { ErrorCard } from './components/ErrorCard';
 import { Features } from './components/Features';
 import { Footer } from './components/Footer';
@@ -16,7 +15,7 @@ import { ResultCard } from './components/ResultCard';
 import { UrlForm } from './components/UrlForm';
 import { useJob } from './hooks/useJob';
 import { ApiError, api } from './lib/api';
-import type { AppConfig, AuthState, JobSnapshot } from './types';
+import type { AppConfig, JobSnapshot } from './types';
 
 type BootState = 'loading' | 'ready' | 'error';
 
@@ -74,7 +73,6 @@ export default function App() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [bootKey, setBootKey] = useState(0);
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [auth, setAuth] = useState<AuthState | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [initialJob, setInitialJob] = useState<JobSnapshot | null>(null);
   const jobSectionRef = useRef<HTMLDivElement>(null);
@@ -90,15 +88,11 @@ export default function App() {
 
     (async () => {
       try {
-        const [appConfig, authState] = await Promise.all([
-          api.getConfig(),
-          api.getAuthState(),
-        ]);
+        const appConfig = await api.getConfig();
 
         if (cancelled) return;
 
         setConfig(appConfig);
-        setAuth(authState);
         setBootState('ready');
       } catch (error) {
         if (cancelled) return;
@@ -130,24 +124,14 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [jobId]);
 
-  useEffect(() => {
-    const handleUnauthorized = () => {
-      setAuth((current) =>
-        current?.authRequired
-          ? { authenticated: false, authRequired: true }
-          : current,
-      );
-      setJobId(null);
-      setInitialJob(null);
-    };
-
-    window.addEventListener('apk-lab:unauthorized', handleUnauthorized);
-    return () =>
-      window.removeEventListener('apk-lab:unauthorized', handleUnauthorized);
-  }, []);
-
   const handleCreate = useCallback(async (url: string) => {
     const snapshot = await api.createJob(url);
+    setInitialJob(snapshot);
+    setJobId(snapshot.id);
+  }, []);
+
+  const handleUpload = useCallback(async (file: File) => {
+    const snapshot = await api.uploadFile(file);
     setInitialJob(snapshot);
     setJobId(snapshot.id);
   }, []);
@@ -158,18 +142,6 @@ export default function App() {
   }, [jobId]);
 
   const handleReset = useCallback(() => {
-    setJobId(null);
-    setInitialJob(null);
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      await api.logout();
-    } catch {
-      // The local session is cleared even if the request fails.
-    }
-
-    setAuth({ authenticated: false, authRequired: true });
     setJobId(null);
     setInitialJob(null);
   }, []);
@@ -187,19 +159,13 @@ export default function App() {
     );
   }
 
-  if (auth?.authRequired && !auth.authenticated) {
-    return <AuthGate onSuccess={setAuth} />;
-  }
-
-  const showLogout = Boolean(auth?.authRequired && auth.authenticated);
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-lab-bg">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-lab-glow" />
       <div className="pointer-events-none absolute inset-0 bg-lab-grid [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_30%,transparent_75%)]" />
 
       <div className="relative z-10">
-        <Header showLogout={showLogout} onLogout={handleLogout} />
+        <Header showLogout={false} onLogout={() => {}} />
 
         <main>
           <Hero />
@@ -207,7 +173,7 @@ export default function App() {
           <section className="mx-auto max-w-3xl px-4 sm:px-6">
             <div ref={jobSectionRef} className="scroll-mt-24">
               {!activeJob ? (
-                <UrlForm onSubmit={handleCreate} maxApkMb={config.maxApkMb} />
+                <UrlForm onSubmit={handleCreate} onUpload={handleUpload} maxApkMb={config.maxApkMb} />
               ) : activeJob.status === 'completed' ? (
                 <ResultCard job={activeJob} logs={logs} onReset={handleReset} />
               ) : activeJob.status === 'failed' ||

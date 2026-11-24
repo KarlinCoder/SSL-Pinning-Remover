@@ -77,9 +77,4 @@ export interface AppConfig {
   version: string;
 }
 
-export interface AuthState {
-  authenticated: boolean;
-  authRequired: boolean;
-}
-
 export type ConnectionState = 'connecting' | 'live' | 'reconnecting' | 'closed';

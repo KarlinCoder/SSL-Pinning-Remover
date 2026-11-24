@@ -1,14 +1,12 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import cookieParser from 'cookie-parser';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { config } from './config.js';
-import { requireAuth } from './auth.js';
 import { JobManager } from './jobs/JobManager.js';
 import { apiErrorBody } from './lib/errors.js';
-import authRouter from './routes/auth.js';
 import configRouter from './routes/config.js';
 import { createJobsRouter } from './routes/jobs.js';
+import { createUploadRouter } from './routes/upload.js';
 
 const app = express();
 const manager = new JobManager();
@@ -16,7 +14,6 @@ const manager = new JobManager();
 app.disable('x-powered-by');
 app.set('trust proxy', config.trustProxy ? 1 : false);
 app.use(express.json({ limit: '64kb' }));
-app.use(cookieParser());
 
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -54,8 +51,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/config', configRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/jobs', requireAuth, createJobsRouter(manager));
+app.use('/api/jobs', createJobsRouter(manager));
+app.use('/api/upload', createUploadRouter(manager));
 
 app.use(
   express.static(config.webDist, {

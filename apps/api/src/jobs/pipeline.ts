@@ -28,64 +28,94 @@ function outputFilename(sourceFilename: string | undefined, kind: PackageKind): 
 export async function runJob(job: Job): Promise<void> {
   await fs.mkdir(job.jobDir, { recursive: true });
 
-  job.setStatus('downloading', 'download', 3);
-  job.log('info', `Descargando desde ${job.sourceHost}...`);
+  const isUpload = job.inputUrl.startsWith('upload://');
 
-  let lastProgressAt = 0;
+  if (isUpload) {
+    // Archivo ya está en disco (escrito por upload.ts), saltamos descarga
+    job.setStatus('inspecting', 'inspect', 18);
+    job.log('info', 'Inspeccionando el archivo subido...');
 
-  const download = await downloadFile({
-    url: job.inputUrl,
-    destDir: job.jobDir,
-    signal: job.signal,
-    maxBytes: config.maxApkBytes,
-    allowPrivateUrls: config.allowPrivateUrls,
-    allowedPorts: config.allowedPorts,
-    timeoutMs: 120_000,
-    onProgress: (received, total) => {
-      job.downloadedBytes = received;
-      job.totalBytes = total ?? undefined;
+    // inputPath ya está seteado en upload.ts
+    if (!job.inputPath) {
+      throw new AppError('MISSING_INPUT', 500, 'Falta la ruta del archivo subido.');
+    }
 
-      const now = Date.now();
-      if (now - lastProgressAt < 500 && received !== total) return;
-      lastProgressAt = now;
+    const stat = await fs.stat(job.inputPath);
+    job.downloadedBytes = stat.size;
+    job.totalBytes = stat.size;
 
-      const percent = total
-        ? 3 + Math.min(14, Math.floor((received / total) * 14))
-        : 5;
-      job.setStatus('downloading', 'download', percent);
-    },
-  });
+    const requiredDisk = stat.size * 5 + 512 * 1024 * 1024;
+    if (!(await hasEnoughDiskSpace(job.jobDir, requiredDisk))) {
+      throw new AppError(
+        'DISK_FULL',
+        507,
+        'No hay espacio suficiente en el servidor para procesar este archivo.',
+        'Libera espacio o aumenta el disco de la VPS. apktool necesita varios GB libres para APKs grandes.',
+      );
+    }
 
-  throwIfAborted(job.signal);
+    const kind = await detectPackageKind(job.inputPath);
+    job.log('success', `Formato detectado: ${kind.toUpperCase()}.`);
+  } else {
+    job.setStatus('downloading', 'download', 3);
+    job.log('info', `Descargando desde ${job.sourceHost}...`);
 
-  job.sourceFilename = download.filename;
-  job.downloadedBytes = download.size;
-  job.totalBytes = download.size;
-  job.log(
-    'success',
-    `Descargado ${download.filename} (${formatBytes(download.size)}).`,
-  );
+    let lastProgressAt = 0;
 
-  const requiredDisk = download.size * 5 + 512 * 1024 * 1024;
-  if (!(await hasEnoughDiskSpace(job.jobDir, requiredDisk))) {
-    throw new AppError(
-      'DISK_FULL',
-      507,
-      'No hay espacio suficiente en el servidor para procesar este archivo.',
-      'Libera espacio o aumenta el disco de la VPS. apktool necesita varios GB libres para APKs grandes.',
+    const download = await downloadFile({
+      url: job.inputUrl,
+      destDir: job.jobDir,
+      signal: job.signal,
+      maxBytes: config.maxApkBytes,
+      allowPrivateUrls: config.allowPrivateUrls,
+      allowedPorts: config.allowedPorts,
+      timeoutMs: 120_000,
+      onProgress: (received, total) => {
+        job.downloadedBytes = received;
+        job.totalBytes = total ?? undefined;
+
+        const now = Date.now();
+        if (now - lastProgressAt < 500 && received !== total) return;
+        lastProgressAt = now;
+
+        const percent = total
+          ? 3 + Math.min(14, Math.floor((received / total) * 14))
+          : 5;
+        job.setStatus('downloading', 'download', percent);
+      },
+    });
+
+    throwIfAborted(job.signal);
+
+    job.sourceFilename = download.filename;
+    job.downloadedBytes = download.size;
+    job.totalBytes = download.size;
+    job.log(
+      'success',
+      `Descargado ${download.filename} (${formatBytes(download.size)}).`,
     );
+
+    const requiredDisk = download.size * 5 + 512 * 1024 * 1024;
+    if (!(await hasEnoughDiskSpace(job.jobDir, requiredDisk))) {
+      throw new AppError(
+        'DISK_FULL',
+        507,
+        'No hay espacio suficiente en el servidor para procesar este archivo.',
+        'Libera espacio o aumenta el disco de la VPS. apktool necesita varios GB libres para APKs grandes.',
+      );
+    }
+
+    job.setStatus('inspecting', 'inspect', 18);
+    job.log('info', 'Inspeccionando el contenedor descargado...');
+
+    const kind = await detectPackageKind(download.path);
+    const extension = kind === 'apk' ? '.apk' : kind === 'xapk' ? '.xapk' : '.apks';
+    const inputPath = path.join(job.jobDir, `input${extension}`);
+    await fs.rename(download.path, inputPath);
+    job.inputPath = inputPath;
+
+    job.log('success', `Formato detectado: ${kind.toUpperCase()}.`);
   }
-
-  job.setStatus('inspecting', 'inspect', 18);
-  job.log('info', 'Inspeccionando el contenedor descargado...');
-
-  const kind = await detectPackageKind(download.path);
-  const extension = kind === 'apk' ? '.apk' : kind === 'xapk' ? '.xapk' : '.apks';
-  const inputPath = path.join(job.jobDir, `input${extension}`);
-  await fs.rename(download.path, inputPath);
-  job.inputPath = inputPath;
-
-  job.log('success', `Formato detectado: ${kind.toUpperCase()}.`);
 
   job.setStatus('patching', 'decode', 25);
   job.log('info', 'Iniciando apk-mitm (apktool + uber-apk-signer)...');

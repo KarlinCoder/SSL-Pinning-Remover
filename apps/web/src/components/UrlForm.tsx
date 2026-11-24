@@ -12,7 +12,7 @@ import {
 
 interface UrlFormProps {
   onSubmit: (url: string) => Promise<void>;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
   maxApkMb: number;
 }
 

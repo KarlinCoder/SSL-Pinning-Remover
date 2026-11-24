@@ -1,0 +1,16 @@
+{
+  "name": "apk-https-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prepara cualquier APK, XAPK o APKS para inspección HTTPS.",
+  "packageManager": "pnpm@10.12.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm --filter @apk-https-lab/web build && pnpm --filter @apk-https-lab/api build",
+    "start": "pnpm --filter @apk-https-lab/api start",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

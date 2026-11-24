@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: apk-https-lab:latest
+    container_name: apk-https-lab
+    init: true
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      DATA_DIR: /data
+      APP_PASSWORD: ${APP_PASSWORD:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      MAX_APK_MB: ${MAX_APK_MB:-1024}
+      MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-1}
+      MAX_QUEUE_LENGTH: ${MAX_QUEUE_LENGTH:-8}
+      JOB_TTL_MIN: ${JOB_TTL_MIN:-60}
+      JOB_TIMEOUT_MIN: ${JOB_TIMEOUT_MIN:-45}
+      MAX_LOG_LINES: ${MAX_LOG_LINES:-2000}
+      ALLOW_PRIVATE_URLS: ${ALLOW_PRIVATE_URLS:-false}
+      ALLOWED_PORTS: ${ALLOWED_PORTS:-80,443}
+      APKTOOL_JAR: /opt/tools/apktool_3.0.3.jar
+      APKTOOL_FALLBACK_JAR: /opt/tools/apktool_2.9.3.jar
+      JAVA_MAX_HEAP_MB: ${JAVA_MAX_HEAP_MB:-2048}
+      MAKE_DEBUGGABLE: ${MAKE_DEBUGGABLE:-false}
+      EXTRA_CA_PATH: ${EXTRA_CA_PATH:-}
+    volumes:
+      - apk-data:/data
+      # Para usar EXTRA_CA_PATH, monta el certificado y ajusta la variable:
+      # - ./mitmproxy-ca-cert.pem:/certs/mitmproxy-ca-cert.pem:ro
+    restart: unless-stopped
+    stop_grace_period: 15s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  apk-data:
